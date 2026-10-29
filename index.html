@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raptor Engine Model</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<style>
+  :root { --bg:#0e1116; --panel:#171c24; --line:#2a323f; --text:#e6e9ee; --dim:#8a94a6; --accent:#ff7a2f; --cool:#4ea1ff; --good:#4cd38a; --bad:#ff5d6c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  h1 { font-size:18px; margin:0; } header span { color:var(--dim); }
+  main { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px 20px; }
+  @media (max-width:900px){ main{grid-template-columns:1fr;} }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim); margin:0 0 10px; }
+  .ctl { margin-bottom:12px; }
+  .ctl .row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ctl label { font-weight:600; }
+  .tag { font-size:10px; padding:1px 6px; border-radius:9px; border:1px solid var(--line); color:var(--dim); margin-left:6px; font-weight:400; }
+  .ctl input[type=number] { width:96px; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 6px; text-align:right; }
+  .ctl input[type=range] { width:100%; accent-color:var(--accent); }
+  .hint { color:var(--dim); font-size:11px; }
+  button { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:4px; padding:5px 10px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  .right { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  svg { width:100%; height:auto; display:block; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+  .kpi { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .kpi .v { font-size:20px; font-weight:700; } .kpi .u { color:var(--dim); font-size:12px; } .kpi .n { color:var(--dim); font-size:11px; }
+  .kpi.main .v { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  td { padding:4px 6px; border-bottom:1px solid var(--line); } td:last-child { text-align:right; }
+  code { color:var(--cool); }
+  .neg { color:var(--bad); } .pos { color:var(--good); }
+ .ctl input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+  .ctl input[type=number]::-webkit-inner-spin-button, .ctl input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  .tile { background:var(--bg); border:1px solid var(--line); border-radius:6px; cursor:pointer; }
+  .tile:hover { border-color:var(--accent); } .tile.open { grid-column:1/-1; border-color:var(--accent); }
+  .tile .top { padding:8px 10px; display:flex; flex-direction:column; gap:2px; }
+  .tile .hd { display:flex; align-items:baseline; gap:8px; color:var(--dim); font-size:12px; }
+  .tile .hd .katex { color:var(--text); font-size:1.1em; }
+  .tile .val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tile.main .val { color:var(--accent); }
+  .tile .note { color:var(--dim); font-size:11px; }
+  .tile .body { padding:0 12px 12px; cursor:default; border-top:1px solid var(--line); }
+  .tile .lbl { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-top:8px; }
+  .tile .desc { color:var(--dim); font-size:12px; margin-top:6px; }
+  .item { border-bottom:1px solid var(--line); }
+  .item > button.var { all:unset; display:flex; width:100%; align-items:center; gap:10px; padding:7px 4px; cursor:pointer; box-sizing:border-box; }
+  .item > button.var:hover { background:var(--bg); }
+  .item .car { color:var(--dim); width:12px; transition:transform .15s; } .item.open .car { transform:rotate(90deg); color:var(--accent); }
+  .item .sym { min-width:64px; } .item .nm { flex:1; } .item .res { font-variant-numeric:tabular-nums; }
+  .item .body { padding:6px 10px 12px 26px; background:var(--bg); border-radius:6px; margin:0 0 8px; }
+  .item .lbl { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-top:6px; }
+  .item .desc { color:var(--dim); font-size:12px; margin-top:6px; }
+  .stages { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:12px; }
+  .stages span { padding:3px 8px; border-radius:12px; border:1px solid var(--line); color:var(--dim); }
+  .stages .on { border-color:var(--accent); color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Raptor Engine Model</h1><span>Stages 1–2 · chamber, nozzle &amp; propellant supply</span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Inputs</h2>
+    <div id="controls"></div>
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="reset">Reset to reference</button>
+      <button id="vac">Vacuum (p<sub>a</sub> = 0)</button>
+    </div>
+  </section>
+
+  <div class="right">
+    <section class="panel">
+      <h2>Engine architecture</h2>
+      <svg id="schematic" viewBox="0 0 960 440" role="img" aria-label="Raptor engine schematic"></svg>
+      <div class="stages">
+        <span class="on">1 Chamber &amp; nozzle (live)</span><span class="on">2 Fuel &amp; LOX supply (live)</span>
+        <span>3 Preburners &amp; turbines</span><span>4 Coupled engine</span>
+      </div>
+    </section>
+
+    <section class="panel"><h2>Results</h2>
+      <div class="hint" style="margin-bottom:8px">Click a result to see its formula, the values plugged in, and the answer.</div>
+      <div class="kpis" id="kpis"></div></section>
+
+    <section class="panel"><h2>Propellant supply</h2>
+      <div class="kpis" id="kpis2"></div></section>
+  </div>
+</main>
+
+<script src="engine.js"></script>
+<script>
+const E = RaptorEngine;
+// k converts the displayed unit to SI. cat describes how the roadmap says to treat the parameter.
+const SPEC = [
+  { id:'Pc',        label:'Chamber pressure',  sym:'P_c',   unit:'MPa', k:1e6, min:1,   max:35,   step:0.1,   val:10,   cat:'operating' },
+  { id:'Tc',        label:'Chamber temperature',sym:'T_c',  unit:'K',   k:1,   min:2000,max:4000, step:10,    val:3500, cat:'thermo' },
+  { id:'gamma',     label:'Specific heat ratio',sym:'γ',     unit:'',    k:1,   min:1.05,max:1.4,  step:0.01,  val:1.2,  cat:'gas' },
+  { id:'R',         label:'Gas constant',      sym:'R',     unit:'J/kg·K',k:1, min:200, max:600,  step:1,     val:350,  cat:'gas' },
+  { id:'At',        label:'Throat area',       sym:'A_t',   unit:'m²',  k:1,   min:0.001,max:0.05,step:0.001, val:0.01, cat:'design' },
+  { id:'Ae',        label:'Exit area',         sym:'A_e',   unit:'m²',  k:1,   min:0.01, max:6,    step:0.01,  val:0.2,  cat:'design' },
+  { id:'pa',        label:'Ambient pressure',  sym:'p_a',   unit:'kPa', k:1e3, min:0,   max:101.325,step:0.1, val:101.325,cat:'environment' },
+  // stage 2: propellant supply
+  { id:'MR',        label:'Mixture ratio (O/F)',sym:'MR',   unit:'',    k:1,   min:2,   max:4.5,  step:0.05,  val:3.6,  cat:'operating', sec:'Propellant supply' },
+  { id:'rhoO',      label:'LOX density',       sym:'ρ_o',   unit:'kg/m³',k:1,  min:1000,max:1250, step:1,     val:1141, cat:'propellant' },
+  { id:'rhoF',      label:'CH₄ density',       sym:'ρ_f',   unit:'kg/m³',k:1,  min:380, max:470,  step:1,     val:423,  cat:'propellant' },
+  { id:'pTank',     label:'Tank pressure',     sym:'p_{tank}',unit:'kPa',k:1e3, min:100, max:600,  step:5,     val:300,  cat:'design' },
+  { id:'etaPump',   label:'Pump efficiency',   sym:'η_p',   unit:'%',   k:0.01,min:40,  max:90,   step:1,     val:75,   cat:'design' },
+  { id:'injDrop',   label:'Injector drop',     sym:'ΔP_{inj}',unit:'% P<sub>c</sub>',k:0.01,min:5, max:40,   step:1,     val:20,   cat:'design' },
+  { id:'coolDrop',  label:'Cooling jacket drop',sym:'ΔP_{cool}',unit:'% P<sub>c</sub>',k:0.01,min:0,max:30,  step:1,     val:10,   cat:'design' },
+];
+const state = {};
+SPEC.forEach(s => state[s.id] = s.val);
+
+const fmt = (x, d=2) => x.toLocaleString('en-US', { maximumFractionDigits:d, minimumFractionDigits:d });
+const SI = () => {
+  const p = Object.fromEntries(SPEC.map(s => [s.id, state[s.id] * s.k]));
+  p.areaRatio = Math.max(p.Ae / p.At, 1.01); // exit must be larger than the throat
+  return p;
+};
+
+// ---------- controls ----------
+const ctl = document.getElementById('controls');
+SPEC.forEach(s => {
+  if (s.sec) { const h = document.createElement('h2'); h.textContent = s.sec; h.style.marginTop = '18px'; ctl.appendChild(h); }
+  const d = document.createElement('div'); d.className = 'ctl';
+  d.innerHTML = `<div class="row"><label for="n_${s.id}">${s.label}</label>
+    <span><input type="number" id="n_${s.id}" min="${s.min}" max="${s.max}" step="${s.step}"> <span class="hint">${s.unit}</span></span></div>
+    <input type="range" id="r_${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+  ctl.appendChild(d);
+  const set = v => { state[s.id] = Math.min(s.max, Math.max(s.min, +v)); update(); };
+  d.querySelector('[type=number]').addEventListener('input', e => e.target.value !== '' && set(e.target.value));
+  d.querySelector('[type=range]').addEventListener('input', e => set(e.target.value));
+});
+// Altitude drives p_a (environment, not an engine design parameter)
+const alt = document.createElement('div'); alt.className = 'ctl';
+alt.innerHTML = `<div class="row"><label for="alt">Altitude</label><span><span id="altv">0</span> <span class="hint">km</span></span></div>
+  <input type="range" id="alt" min="0" max="40" step="0.5" value="0"><div class="hint">Sets p<sub>a</sub> from a standard atmosphere</div>`;
+ctl.insertBefore(alt, ctl.querySelector('h2'));
+alt.querySelector('input').addEventListener('input', e => {
+  document.getElementById('altv').textContent = e.target.value;
+  state.pa = E.ambientPressure(e.target.value * 1000) / 1000; update();
+});
+document.getElementById('reset').onclick = () => { SPEC.forEach(s => state[s.id] = s.val); document.getElementById('alt').value = 0; document.getElementById('altv').textContent = 0; update(); };
+document.getElementById('vac').onclick = () => { state.pa = 0; update(); };
+
+// ---------- schematic ----------
+function box(x, y, w, h, title, sub, live) {
+  const c = live ? 'var(--accent)' : 'var(--line)', t = live ? 'var(--text)' : 'var(--dim)';
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="var(--panel)" stroke="${c}" stroke-width="${live?2:1.2}" ${live?'':'stroke-dasharray="5 4"'}/>
+    <text x="${x+w/2}" y="${y+h/2-2}" fill="${t}" text-anchor="middle" font-size="13" font-weight="600">${title}</text>
+    <text x="${x+w/2}" y="${y+h/2+14}" fill="var(--dim)" text-anchor="middle" font-size="10">${sub}</text>`;
+}
+const F = '#4ea1ff', O = '#4cd38a';
+const pipe = (d, col='var(--dim)', dash='') => `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" ${dash?`stroke-dasharray="${dash}"`:''} marker-end="url(#ah)"/>`;
+
+function drawSchematic(r, p, s) {
+  const cy = 220, xc = 660, xt = 760, xe = 930, re = 92;
+  const rt = re / Math.sqrt(p.areaRatio);
+  const rc = Math.max(rt * 1.3, Math.min(rt * 1.9, 62));
+  const pts = [[xc, rc], [xc + 55, rc], [xt, rt]];
+  const N = 40; for (let i = 1; i <= N; i++) { const s = i / N; pts.push([xt + (xe - xt) * s, rt + (re - rt) * (1 - (1 - s) ** 2)]); }
+  const top = pts.map(([x, h]) => `${x},${cy - h}`).join(' L');
+  const bot = pts.slice().reverse().map(([x, h]) => `${x},${cy + h}`).join(' L');
+  const ov = r.pe < p.pa;
+  const exitCol = ov ? 'var(--bad)' : 'var(--good)';
+  const hot = `<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ff5a1f"/><stop offset=".4" stop-color="#ff9d2f"/><stop offset="1" stop-color="#ffd9a0" stop-opacity=".25"/></linearGradient>
+    <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="context-stroke"/></marker></defs>`;
+  return hot +
+    box(20,40,110,60,'CH₄ tank',`${fmt(p.pTank/1e3,0)} kPa · ${fmt(s.mdotF,1)} kg/s`,true) + box(20,340,110,60,'LOX tank',`${fmt(p.pTank/1e3,0)} kPa · ${fmt(s.mdotO,1)} kg/s`,true) +
+    box(170,40,110,60,'Fuel pump',`${fmt(s.pDisF/1e6,1)} MPa · ${fmt(s.powerF/1e3,0)} kW`,true) + box(170,340,110,60,'LOX pump',`${fmt(s.pDisO/1e6,1)} MPa · ${fmt(s.powerO/1e3,0)} kW`,true) +
+    box(330,40,120,60,'Fuel-rich PB','stage 3') + box(330,340,120,60,'Ox-rich PB','stage 3') +
+    box(490,40,100,60,'Turbine','stage 3') + box(490,340,100,60,'Turbine','stage 3') +
+    pipe('M130 70H168',F) + pipe('M280 70H328',F) + pipe('M450 70H488') + pipe('M590 70H625Q640 70 640 90V190H658') +
+    pipe('M130 370H168',O) + pipe('M280 370H328',O) + pipe('M450 370H488') + pipe('M590 370H625Q640 370 640 350V250H658') +
+    pipe('M250 100V200H390V338',F) + pipe('M250 340V240H420V102',O) +
+    `<path d="M225 40V24H540V40" fill="none" stroke="var(--dim)" stroke-dasharray="3 3"/><text x="382" y="16" fill="var(--dim)" font-size="10" text-anchor="middle">shaft power (stage 3)</text>` +
+    `<path d="M225 400V416H540V400" fill="none" stroke="var(--dim)" stroke-dasharray="3 3"/>` +
+    `<line x1="20" y1="424" x2="44" y2="424" stroke="${F}" stroke-width="2"/><text x="50" y="428" fill="var(--dim)" font-size="10">CH₄ (fuel)</text>` +
+    `<line x1="110" y1="424" x2="134" y2="424" stroke="${O}" stroke-width="2"/><text x="140" y="428" fill="var(--dim)" font-size="10">LOX</text>` +
+    `<text x="612" y="212" fill="var(--dim)" font-size="10" text-anchor="end">injector</text>` +
+    `<path d="M${top} L${bot} Z" fill="url(#g)" stroke="var(--accent)" stroke-width="2.2"/>` +
+    `<line x1="${xc}" y1="${cy-rc}" x2="${xc}" y2="${cy+rc}" stroke="var(--accent)" stroke-width="2.2"/>` +
+    `<text x="${xc}" y="${cy-rc-28}" fill="var(--accent)" font-size="12" font-weight="600">Chamber</text>` +
+    `<text x="${xc}" y="${cy-rc-14}" fill="var(--text)" font-size="11">${fmt(p.Pc/1e6,1)} MPa · ${fmt(p.Tc,0)} K</text>` +
+    `<line x1="${xt}" y1="${cy-rt-6}" x2="${xt}" y2="${cy+rt+6}" stroke="#fff" stroke-dasharray="3 3"/>` +
+    `<text x="${xt}" y="${cy+Math.max(rt,rc)+26}" fill="var(--text)" font-size="11" text-anchor="middle">Throat M=1</text>` +
+    `<text x="${xt}" y="${cy+Math.max(rt,rc)+40}" fill="var(--dim)" font-size="10" text-anchor="middle">${fmt(r.Tthroat,0)} K · ${fmt(r.Pthroat/1e6,2)} MPa</text>` +
+    `<line x1="${xe}" y1="${cy-re}" x2="${xe}" y2="${cy+re}" stroke="${exitCol}" stroke-width="2" stroke-dasharray="4 3"/>` +
+    `<text x="${xe-6}" y="${cy+re+22}" fill="${exitCol}" font-size="11" text-anchor="end">Exit M=${fmt(r.Me,2)} · ${fmt(r.pe/1e3,1)} kPa</text>` +
+    `<text x="${xe-6}" y="${cy+re+36}" fill="var(--dim)" font-size="10" text-anchor="end">${fmt(r.ve,0)} m/s</text>` +
+    `<text x="${xe-6}" y="${cy-re-8}" fill="var(--dim)" font-size="10" text-anchor="end">ambient ${fmt(p.pa/1e3,1)} kPa</text>`;
+}
+
+// ---------- results ----------
+function update() {
+  SPEC.forEach(s => { document.getElementById('n_'+s.id).value = state[s.id]; document.getElementById('r_'+s.id).value = state[s.id]; });
+  const p = SI(), r = E.computeNozzle(p), s = E.computeSupply(p, r);
+
+  document.getElementById('schematic').innerHTML = drawSchematic(r, p, s);
+
+  renderCalc(p, r, s);
+}
+
+// ---------- worked calculation (click a variable to expand) ----------
+const open = new Set(['F']);
+const N = (x, d=2) => x.toLocaleString('en-US', { maximumFractionDigits:d, minimumFractionDigits:d }).replace(/,/g, '{,}');
+const tex = (t, el) => { if (window.katex) katex.render(t, el, { throwOnError:false, displayMode:true }); else el.textContent = t; };
+const texInline = t => window.katex ? katex.renderToString(t, { throwOnError:false }) : t;
+
+function items(p, r) {
+  const g = p.gamma, ex = (g+1)/(2*(g-1));
+  const kN = x => N(x/1e3,2) + '\\,\\text{kN}';
+  return [
+    { id:'eps', sym:'\\varepsilon', name:'Area ratio', res:fmt(r.Ae/p.At,2),
+      f:'\\varepsilon = \\frac{A_e}{A_t}', v:`\\varepsilon = \\frac{${N(r.Ae,3)}}{${N(p.At,4)}}`, o:`\\varepsilon = ${N(r.Ae/p.At,2)}`,
+      d:'Exit-to-throat area ratio. Set by your A_e and A_t inputs; it drives the exit Mach number.' },
+    { id:'mdot', sym:'\\dot m', name:'Mass flow (choked throat)', res:`${fmt(r.mdot,2)} kg/s`,
+      f:'\\dot m = A_t\\,P_c\\sqrt{\\frac{\\gamma}{R\\,T_c}}\\left(\\frac{2}{\\gamma+1}\\right)^{\\frac{\\gamma+1}{2(\\gamma-1)}}',
+      v:`\\dot m = (${N(p.At,4)})(${N(p.Pc,0)})\\sqrt{\\frac{${N(g,2)}}{(${N(p.R,0)})(${N(p.Tc,0)})}}\\left(\\frac{2}{${N(g+1,2)}}\\right)^{${N(ex,3)}}`,
+      o:`\\dot m = ${N(r.mdot,3)}\\,\\text{kg/s}`,
+      d:'Total exhaust flow set by the choked throat, not the fuel flow alone.' },
+    { id:'Me', sym:'M_e', name:'Exit Mach number', res:fmt(r.Me,3),
+      f:'\\varepsilon = \\frac{A_e}{A_t} = \\frac{1}{M_e}\\left[\\frac{2}{\\gamma+1}\\left(1+\\frac{\\gamma-1}{2}M_e^2\\right)\\right]^{\\frac{\\gamma+1}{2(\\gamma-1)}}',
+      v:`${N(p.areaRatio,2)} = \\frac{1}{M_e}\\left[\\frac{2}{${N(g+1,2)}}\\left(1+\\frac{${N(g-1,2)}}{2}M_e^2\\right)\\right]^{${N(ex,3)}}`,
+      o:`M_e = ${N(r.Me,4)}`,
+      d:'No closed-form inverse exists, so the supersonic root is found numerically (bisection).' },
+    { id:'pe', sym:'p_e', name:'Exit pressure', res:`${fmt(r.pe/1e3,1)} kPa`,
+      f:'p_e = P_c\\left(1+\\frac{\\gamma-1}{2}M_e^2\\right)^{-\\frac{\\gamma}{\\gamma-1}}',
+      v:`p_e = ${N(p.Pc,0)}\\left(1+\\frac{${N(g-1,2)}}{2}(${N(r.Me,4)})^2\\right)^{-${N(g/(g-1),2)}}`,
+      o:`p_e = ${N(r.pe,0)}\\,\\text{Pa}` },
+    { id:'ve', sym:'v_e', name:'Exit velocity', res:`${fmt(r.ve,0)} m/s`,
+      f:'v_e = \\sqrt{\\frac{2\\gamma}{\\gamma-1}\\,R\\,T_c\\left[1-\\left(\\frac{p_e}{P_c}\\right)^{\\frac{\\gamma-1}{\\gamma}}\\right]}',
+      v:`v_e = \\sqrt{\\frac{2(${N(g,2)})}{${N(g-1,2)}}(${N(p.R,0)})(${N(p.Tc,0)})\\left[1-\\left(\\frac{${N(r.pe,0)}}{${N(p.Pc,0)}}\\right)^{${N((g-1)/g,4)}}\\right]}`,
+      o:`v_e = ${N(r.ve,1)}\\,\\text{m/s}` },
+    { id:'Fm', sym:'F_{mom}', name:'Momentum thrust', res:`${fmt(r.Fmomentum/1e3,1)} kN`,
+      f:'F_{mom} = \\dot m \\cdot v_e', v:`F_{mom} = ${N(r.mdot,3)} \\times ${N(r.ve,2)}`, o:`F_{mom} = ${kN(r.Fmomentum)}` },
+    { id:'Fp', sym:'F_{press}', name:'Pressure thrust', res:`${fmt(r.Fpressure/1e3,1)} kN`,
+      f:'F_{press} = (p_e - p_a)\\cdot A_e', v:`F_{press} = (${N(r.pe,0)} - ${N(p.pa,0)}) \\times ${N(r.Ae,3)}`, o:`F_{press} = ${kN(r.Fpressure)}`,
+      d:'Negative when the nozzle is over-expanded (p_e below ambient).' },
+    { id:'F', sym:'F', name:'Total thrust', res:`${fmt(r.F/1e3,1)} kN`, note:r.regime, main:true,
+      f:'F = \\dot m \\, v_e + (p_e - p_a)\\,A_e', v:`F = ${N(r.Fmomentum,0)} + (${N(r.Fpressure,0)})`, o:`F = ${kN(r.F)}` },
+    { id:'Isp', sym:'I_{sp}', name:'Specific impulse', res:`${fmt(r.Isp,1)} s`,
+      f:'I_{sp} = \\frac{F}{\\dot m \\, g_0}', v:`I_{sp} = \\frac{${N(r.F,0)}}{(${N(r.mdot,3)})(${N(E.G0,5)})}`, o:`I_{sp} = ${N(r.Isp,1)}\\,\\text{s}`,
+      d:`Thrust per unit weight-flow of propellant, a measure of engine efficiency. At p_a = 0 it is ${N(r.IspVac,1)} s.` },
+    { id:'Cf', sym:'C_F', name:'Thrust coefficient', res:fmt(r.Cf,3),
+      f:'C_F = \\frac{F}{P_c \\, A_t}', v:`C_F = \\frac{${N(r.F,0)}}{(${N(p.Pc,0)})(${N(p.At,4)})}`, o:`C_F = ${N(r.Cf,3)}`,
+      d:'How much the nozzle amplifies chamber force P_c·A_t into thrust. Depends on the nozzle and γ, not on combustion.' },
+    { id:'cs', sym:'c^*', name:'Characteristic velocity', res:`${fmt(r.cStar,0)} m/s`,
+      f:'c^* = \\frac{P_c \\, A_t}{\\dot m}', v:`c^* = \\frac{(${N(p.Pc,0)})(${N(p.At,4)})}{${N(r.mdot,3)}}`, o:`c^* = ${N(r.cStar,1)}\\,\\text{m/s}`,
+      d:'c* ("c-star") measures how well the combustion chamber turns propellant into chamber pressure, independent of the nozzle. It rises with hotter, lighter exhaust (higher T_c / lower molecular weight) and is used to judge combustion efficiency. Note Isp ≈ c*·C_F / g₀.' },
+  ];
+}
+
+function supplyItems(p, r, s) {
+  const kW = x => N(x/1e3,1) + '\\,\\text{kW}', MPa = x => N(x/1e6,2) + '\\,\\text{MPa}';
+  return [
+    { id:'mo', sym:'\\dot m_o', name:'LOX flow', res:`${fmt(s.mdotO,2)} kg/s`,
+      f:'\\dot m_o = \\dot m\\,\\frac{MR}{1+MR}', v:`\\dot m_o = ${N(r.mdot,3)} \\cdot \\frac{${N(p.MR,2)}}{${N(1+p.MR,2)}}`, o:`\\dot m_o = ${N(s.mdotO,3)}\\,\\text{kg/s}`,
+      d:'The mixture ratio splits the choked-throat mass flow from stage 1 into oxidizer and fuel.' },
+    { id:'mf', sym:'\\dot m_f', name:'CH₄ flow', res:`${fmt(s.mdotF,2)} kg/s`,
+      f:'\\dot m_f = \\frac{\\dot m}{1+MR}', v:`\\dot m_f = \\frac{${N(r.mdot,3)}}{${N(1+p.MR,2)}}`, o:`\\dot m_f = ${N(s.mdotF,3)}\\,\\text{kg/s}` },
+    { id:'Q', sym:'Q', name:'Volumetric flow (O / F)', res:`${fmt(s.QO*1e3,1)} / ${fmt(s.QF*1e3,1)} L/s`,
+      f:'Q = \\frac{\\dot m}{\\rho}', v:`Q_o = \\frac{${N(s.mdotO,3)}}{${N(p.rhoO,0)}} \\quad Q_f = \\frac{${N(s.mdotF,3)}}{${N(p.rhoF,0)}}`,
+      o:`Q_o = ${N(s.QO*1e3,2)}\\,\\text{L/s} \\quad Q_f = ${N(s.QF*1e3,2)}\\,\\text{L/s}`,
+      d:'Methane is less than half as dense as LOX, so a quarter of the mass is still about three quarters of the volume.' },
+    { id:'pd', sym:'P_{dis}', name:'Pump discharge (O / F)', res:`${fmt(s.pDisO/1e6,1)} / ${fmt(s.pDisF/1e6,1)} MPa`,
+      f:'P_{dis,o} = P_c(1+\\Delta P_{inj}) \\quad P_{dis,f} = P_c(1+\\Delta P_{inj}+\\Delta P_{cool})',
+      v:`P_{dis,o} = ${N(p.Pc,0)}(1+${N(p.injDrop,2)}) \\quad P_{dis,f} = ${N(p.Pc,0)}(1+${N(p.injDrop,2)}+${N(p.coolDrop,2)})`,
+      o:`P_{dis,o} = ${MPa(s.pDisO)} \\quad P_{dis,f} = ${MPa(s.pDisF)}`,
+      d:'Propellant must arrive above chamber pressure to flow in. Fuel also loses pressure in the regenerative cooling jacket on the way. Preburner pressure is added in stage 3.' },
+    { id:'H', sym:'H', name:'Pump head (O / F)', res:`${fmt(s.headO,0)} / ${fmt(s.headF,0)} m`,
+      f:'H = \\frac{P_{dis} - p_{tank}}{\\rho\\,g_0}', v:`H_o = \\frac{${N(s.dPO,0)}}{(${N(p.rhoO,0)})(${N(E.G0,3)})} \\quad H_f = \\frac{${N(s.dPF,0)}}{(${N(p.rhoF,0)})(${N(E.G0,3)})}`,
+      o:`H_o = ${N(s.headO,0)}\\,\\text{m} \\quad H_f = ${N(s.headF,0)}\\,\\text{m}`,
+      d:'The height of a column of the liquid the pump could lift. Low-density methane needs about three times the head of LOX, which is why fuel pumps spin faster or use more stages.' },
+    { id:'Po', sym:'\\mathcal{P}_o', name:'LOX pump power', res:`${fmt(s.powerO/1e3,0)} kW`,
+      f:'\\mathcal{P}_o = \\frac{\\dot m_o\\,(P_{dis,o}-p_{tank})}{\\rho_o\\,\\eta_p}', v:`\\mathcal{P}_o = \\frac{(${N(s.mdotO,3)})(${N(s.dPO,0)})}{(${N(p.rhoO,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_o = ${kW(s.powerO)}` },
+    { id:'Pf', sym:'\\mathcal{P}_f', name:'Fuel pump power', res:`${fmt(s.powerF/1e3,0)} kW`,
+      f:'\\mathcal{P}_f = \\frac{\\dot m_f\\,(P_{dis,f}-p_{tank})}{\\rho_f\\,\\eta_p}', v:`\\mathcal{P}_f = \\frac{(${N(s.mdotF,3)})(${N(s.dPF,0)})}{(${N(p.rhoF,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_f = ${kW(s.powerF)}` },
+    { id:'Pt', sym:'\\mathcal{P}_{tot}', name:'Total pump power', res:`${fmt(s.powerTotal/1e3,0)} kW`, note:'turbines must supply this (stage 3)', main:true,
+      f:'\\mathcal{P}_{tot} = \\mathcal{P}_o + \\mathcal{P}_f', v:`\\mathcal{P}_{tot} = ${N(s.powerO,0)} + ${N(s.powerF,0)}`, o:`\\mathcal{P}_{tot} = ${kW(s.powerTotal)}`,
+      d:'The fuel pump needs almost as much power as the LOX pump while moving about a quarter of the mass, because methane is so much less dense.' },
+  ];
+}
+
+function renderCalc(p, r, s) {
+  renderTiles('kpis', items(p, r), () => renderCalc(p, r, s));
+  renderTiles('kpis2', supplyItems(p, r, s), () => renderCalc(p, r, s));
+}
+
+function renderTiles(id, list, rerender) {
+  const box = document.getElementById(id); box.innerHTML = '';
+  list.forEach(it => {
+    const isOpen = open.has(it.id);
+    const d = document.createElement('div'); d.className = 'tile' + (isOpen ? ' open' : '') + (it.main ? ' main' : '');
+    d.innerHTML = `<div class="top"><div class="hd">${texInline(it.sym)}<span>${it.name}</span></div><div class="val">${it.res}</div>${it.note ? `<div class="note">${it.note}</div>` : ''}</div>`;
+    d.querySelector('.top').onclick = () => { isOpen ? open.delete(it.id) : open.add(it.id); rerender(); };
+    if (isOpen) {
+      const b = document.createElement('div'); b.className = 'body';
+      b.innerHTML = '<div class="lbl">Formula</div><div class="f"></div><div class="lbl">Values plugged in</div><div class="v"></div><div class="lbl">Result</div><div class="o"></div>' + (it.d ? `<div class="desc">${it.d}</div>` : '');
+      tex(it.f, b.querySelector('.f')); tex(it.v, b.querySelector('.v')); tex(it.o, b.querySelector('.o'));
+      d.appendChild(b);
+    }
+    box.appendChild(d);
+  });
+}
+update();
+</script>
+</body>
+</html>
