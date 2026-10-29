@@ -160,6 +160,10 @@ function box(x, y, w, h, title, sub, live) {
 const F = '#4ea1ff', O = '#4cd38a';
 const pipe = (d, col='var(--dim)', dash='') => `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" ${dash?`stroke-dasharray="${dash}"`:''} marker-end="url(#ah)"/>`;
 
+// mass-flow label on a tank-to-pump line: value above the arrow, unit below
+const flowLabel = (x, y, v, col) => `<text x="${x}" y="${y-6}" fill="${col}" font-size="11" font-weight="600" text-anchor="middle">${fmt(v,1)}</text>
+  <text x="${x}" y="${y+14}" fill="var(--dim)" font-size="9" text-anchor="middle">kg/s</text>`;
+
 function drawSchematic(r, p, s) {
   const cy = 220, xc = 660, xt = 760, xe = 930, re = 92;
   const rt = re / Math.sqrt(p.areaRatio);
@@ -173,7 +177,8 @@ function drawSchematic(r, p, s) {
   const hot = `<defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ff5a1f"/><stop offset=".4" stop-color="#ff9d2f"/><stop offset="1" stop-color="#ffd9a0" stop-opacity=".25"/></linearGradient>
     <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="context-stroke"/></marker></defs>`;
   return hot +
-    box(20,40,110,60,'CH₄ tank',`${fmt(p.pTank/1e3,0)} kPa · ${fmt(s.mdotF,1)} kg/s`,true) + box(20,340,110,60,'LOX tank',`${fmt(p.pTank/1e3,0)} kPa · ${fmt(s.mdotO,1)} kg/s`,true) +
+    box(20,40,110,60,'CH₄ tank',`${fmt(p.pTank/1e3,0)} kPa`,true) + box(20,340,110,60,'LOX tank',`${fmt(p.pTank/1e3,0)} kPa`,true) +
+    flowLabel(149, 70, s.mdotF, F) + flowLabel(149, 370, s.mdotO, O) +
     box(170,40,110,60,'Fuel pump',`${fmt(s.pDisF/1e6,1)} MPa · ${fmt(s.powerF/1e3,0)} kW`,true) + box(170,340,110,60,'LOX pump',`${fmt(s.pDisO/1e6,1)} MPa · ${fmt(s.powerO/1e3,0)} kW`,true) +
     box(330,40,120,60,'Fuel-rich PB','stage 3') + box(330,340,120,60,'Ox-rich PB','stage 3') +
     box(490,40,100,60,'Turbine','stage 3') + box(490,340,100,60,'Turbine','stage 3') +
