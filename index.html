@@ -48,6 +48,7 @@
   .tile .body { padding:0 12px 12px; cursor:default; border-top:1px solid var(--line); }
   .tile .lbl { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-top:8px; }
   .tile .desc { color:var(--dim); font-size:12px; margin-top:6px; }
+  .tile .body { min-width:0; } .tile .katex-display { overflow-x:auto; overflow-y:hidden; padding:2px 0; }
   .item { border-bottom:1px solid var(--line); }
   .item > button.var { all:unset; display:flex; width:100%; align-items:center; gap:10px; padding:7px 4px; cursor:pointer; box-sizing:border-box; }
   .item > button.var:hover { background:var(--bg); }
@@ -240,7 +241,11 @@ function update() {
 // ---------- worked calculation (click a variable to expand) ----------
 const open = new Set(['F']);
 const N = (x, d=2) => x.toLocaleString('en-US', { maximumFractionDigits:d, minimumFractionDigits:d }).replace(/,/g, '{,}');
-const tex = (t, el) => { if (window.katex) katex.render(t, el, { throwOnError:false, displayMode:true }); else el.textContent = t; };
+// Equations written side by side (separated by \quad) are stacked so they fit narrow tiles
+const stack = t => { const parts = t.split(/\\q?quad\s*/); return parts.length > 1 ? `\\begin{gathered}${parts.join('\\\\')}\\end{gathered}` : t; };
+// An array is several lines of working, aligned on '&' (e.g. 'x &= ...', '&= ...')
+const lines = t => Array.isArray(t) ? `\\begin{aligned}${t.join('\\\\')}\\end{aligned}` : stack(t);
+const tex = (t, el) => { if (window.katex) katex.render(lines(t), el, { throwOnError:false, displayMode:true }); else el.textContent = t; };
 const texInline = t => window.katex ? katex.renderToString(t, { throwOnError:false }) : t;
 
 function items(p, r) {
@@ -252,21 +257,21 @@ function items(p, r) {
       d:'Exit-to-throat area ratio. Set by your A_e and A_t inputs; it drives the exit Mach number.' },
     { id:'mdot', sym:'\\dot m', name:'Mass flow (choked throat)', res:`${fmt(r.mdot,2)} kg/s`,
       f:'\\dot m = A_t\\,P_c\\sqrt{\\frac{\\gamma}{R\\,T_c}}\\left(\\frac{2}{\\gamma+1}\\right)^{\\frac{\\gamma+1}{2(\\gamma-1)}}',
-      v:`\\dot m = (${N(p.At,4)})(${N(p.Pc,0)})\\sqrt{\\frac{${N(g,2)}}{(${N(p.R,0)})(${N(p.Tc,0)})}}\\left(\\frac{2}{${N(g+1,2)}}\\right)^{${N(ex,3)}}`,
+      v:`\\dot m = (${N(p.At,4)})(${N(p.Pc,0)})\\sqrt{\\frac{${N(g,2)}}{(${N(p.R,0)})(${N(p.Tc,0)})}}\\left(\\frac{2}{${N(g,2)}+1}\\right)^{\\frac{${N(g,2)}+1}{2(${N(g,2)}-1)}}`,
       o:`\\dot m = ${N(r.mdot,3)}\\,\\text{kg/s}`,
       d:'Total exhaust flow set by the choked throat, not the fuel flow alone.' },
     { id:'Me', sym:'M_e', name:'Exit Mach number', res:fmt(r.Me,3),
       f:'\\varepsilon = \\frac{A_e}{A_t} = \\frac{1}{M_e}\\left[\\frac{2}{\\gamma+1}\\left(1+\\frac{\\gamma-1}{2}M_e^2\\right)\\right]^{\\frac{\\gamma+1}{2(\\gamma-1)}}',
-      v:`${N(p.areaRatio,2)} = \\frac{1}{M_e}\\left[\\frac{2}{${N(g+1,2)}}\\left(1+\\frac{${N(g-1,2)}}{2}M_e^2\\right)\\right]^{${N(ex,3)}}`,
+      v:`${N(p.areaRatio,2)} = \\frac{1}{M_e}\\left[\\frac{2}{${N(g,2)}+1}\\left(1+\\frac{${N(g,2)}-1}{2}M_e^2\\right)\\right]^{\\frac{${N(g,2)}+1}{2(${N(g,2)}-1)}}`,
       o:`M_e = ${N(r.Me,4)}`,
       d:'No closed-form inverse exists, so the supersonic root is found numerically (bisection).' },
     { id:'pe', sym:'p_e', name:'Exit pressure', res:`${fmt(r.pe/1e3,1)} kPa`,
       f:'p_e = P_c\\left(1+\\frac{\\gamma-1}{2}M_e^2\\right)^{-\\frac{\\gamma}{\\gamma-1}}',
-      v:`p_e = ${N(p.Pc,0)}\\left(1+\\frac{${N(g-1,2)}}{2}(${N(r.Me,4)})^2\\right)^{-${N(g/(g-1),2)}}`,
+      v:`p_e = ${N(p.Pc,0)}\\left(1+\\frac{${N(g,2)}-1}{2}(${N(r.Me,4)})^2\\right)^{-\\frac{${N(g,2)}}{${N(g,2)}-1}}`,
       o:`p_e = ${N(r.pe,0)}\\,\\text{Pa}` },
     { id:'ve', sym:'v_e', name:'Exit velocity', res:`${fmt(r.ve,0)} m/s`,
       f:'v_e = \\sqrt{\\frac{2\\gamma}{\\gamma-1}\\,R\\,T_c\\left[1-\\left(\\frac{p_e}{P_c}\\right)^{\\frac{\\gamma-1}{\\gamma}}\\right]}',
-      v:`v_e = \\sqrt{\\frac{2(${N(g,2)})}{${N(g-1,2)}}(${N(p.R,0)})(${N(p.Tc,0)})\\left[1-\\left(\\frac{${N(r.pe,0)}}{${N(p.Pc,0)}}\\right)^{${N((g-1)/g,4)}}\\right]}`,
+      v:`v_e = \\sqrt{\\frac{2(${N(g,2)})}{${N(g,2)}-1}(${N(p.R,0)})(${N(p.Tc,0)})\\left[1-\\left(\\frac{${N(r.pe,0)}}{${N(p.Pc,0)}}\\right)^{\\frac{${N(g,2)}-1}{${N(g,2)}}}\\right]}`,
       o:`v_e = ${N(r.ve,1)}\\,\\text{m/s}` },
     { id:'Fm', sym:'F_{mom}', name:'Momentum thrust', res:`${fmt(r.Fmomentum/1e3,1)} kN`,
       f:'F_{mom} = \\dot m \\cdot v_e', v:`F_{mom} = ${N(r.mdot,3)} \\times ${N(r.ve,2)}`, o:`F_{mom} = ${kN(r.Fmomentum)}` },
@@ -274,7 +279,7 @@ function items(p, r) {
       f:'F_{press} = (p_e - p_a)\\cdot A_e', v:`F_{press} = (${N(r.pe,0)} - ${N(p.pa,0)}) \\times ${N(r.Ae,3)}`, o:`F_{press} = ${kN(r.Fpressure)}`,
       d:'Negative when the nozzle is over-expanded (p_e below ambient).' },
     { id:'F', sym:'F', name:'Total thrust', res:`${fmt(r.F/1e3,1)} kN`, note:r.regime, main:true,
-      f:'F = \\dot m \\, v_e + (p_e - p_a)\\,A_e', v:`F = ${N(r.Fmomentum,0)} + (${N(r.Fpressure,0)})`, o:`F = ${kN(r.F)}` },
+      f:'F = \\dot m \\, v_e + (p_e - p_a)\\,A_e', v:[`F &= (${N(r.mdot,3)})(${N(r.ve,2)}) + (${N(r.pe,0)} - ${N(p.pa,0)})(${N(r.Ae,3)})`, `&= ${N(r.Fmomentum,0)} + (${N(r.Fpressure,0)})`], o:`F = ${kN(r.F)}` },
     { id:'Isp', sym:'I_{sp}', name:'Specific impulse', res:`${fmt(r.Isp,1)} s`,
       f:'I_{sp} = \\frac{F}{\\dot m \\, g_0}', v:`I_{sp} = \\frac{${N(r.F,0)}}{(${N(r.mdot,3)})(${N(E.G0,5)})}`, o:`I_{sp} = ${N(r.Isp,1)}\\,\\text{s}`,
       d:`Thrust per unit weight-flow of propellant, a measure of engine efficiency. At p_a = 0 it is ${N(r.IspVac,1)} s.` },
@@ -291,10 +296,10 @@ function supplyItems(p, r, s, t) {
   const kW = x => N(x/1e3,1) + '\\,\\text{kW}', MPa = x => N(x/1e6,2) + '\\,\\text{MPa}';
   return [
     { id:'mo', sym:'\\dot m_o', name:'LOX flow', res:`${fmt(s.mdotO,2)} kg/s`,
-      f:'\\dot m_o = \\dot m\\,\\frac{MR}{1+MR}', v:`\\dot m_o = ${N(r.mdot,3)} \\cdot \\frac{${N(p.MR,2)}}{${N(1+p.MR,2)}}`, o:`\\dot m_o = ${N(s.mdotO,3)}\\,\\text{kg/s}`,
+      f:'\\dot m_o = \\dot m\\,\\frac{MR}{1+MR}', v:`\\dot m_o = ${N(r.mdot,3)} \\cdot \\frac{${N(p.MR,2)}}{1+${N(p.MR,2)}}`, o:`\\dot m_o = ${N(s.mdotO,3)}\\,\\text{kg/s}`,
       d:'The mixture ratio splits the choked-throat mass flow from stage 1 into oxidizer and fuel.' },
     { id:'mf', sym:'\\dot m_f', name:'CH₄ flow', res:`${fmt(s.mdotF,2)} kg/s`,
-      f:'\\dot m_f = \\frac{\\dot m}{1+MR}', v:`\\dot m_f = \\frac{${N(r.mdot,3)}}{${N(1+p.MR,2)}}`, o:`\\dot m_f = ${N(s.mdotF,3)}\\,\\text{kg/s}` },
+      f:'\\dot m_f = \\frac{\\dot m}{1+MR}', v:`\\dot m_f = \\frac{${N(r.mdot,3)}}{1+${N(p.MR,2)}}`, o:`\\dot m_f = ${N(s.mdotF,3)}\\,\\text{kg/s}` },
     { id:'QO', sym:'Q_o', name:'LOX volumetric flow', res:`${fmt(s.QO*1e3,1)} L/s`,
       f:'Q_o = \\frac{\\dot m_o}{\\rho_o}', v:`Q_o = \\frac{${N(s.mdotO,3)}}{${N(p.rhoO,0)}}`,
       o:`Q_o = ${N(s.QO,5)}\\,\\text{m}^3\\text{/s} = ${N(s.QO*1e3,2)}\\,\\text{L/s}` },
@@ -314,13 +319,13 @@ function supplyItems(p, r, s, t) {
       o:`P_{dis,o} = ${MPa(s.pDisO)} \\quad P_{dis,f} = ${MPa(s.pDisF)}`,
       d:'The turbines cannot balance the pumps at these inputs, so this falls back to only clearing the main injector.' },
     { id:'H', sym:'H', name:'Pump head (O / F)', res:`${fmt(s.headO,0)} / ${fmt(s.headF,0)} m`,
-      f:'H = \\frac{P_{dis} - p_{tank}}{\\rho\\,g_0}', v:`H_o = \\frac{${N(s.dPO,0)}}{(${N(p.rhoO,0)})(${N(E.G0,3)})} \\quad H_f = \\frac{${N(s.dPF,0)}}{(${N(p.rhoF,0)})(${N(E.G0,3)})}`,
+      f:'H = \\frac{P_{dis} - p_{tank}}{\\rho\\,g_0}', v:`H_o = \\frac{${N(s.pDisO,0)} - ${N(p.pTank,0)}}{(${N(p.rhoO,0)})(${N(E.G0,3)})} \\quad H_f = \\frac{${N(s.pDisF,0)} - ${N(p.pTank,0)}}{(${N(p.rhoF,0)})(${N(E.G0,3)})}`,
       o:`H_o = ${N(s.headO,0)}\\,\\text{m} \\quad H_f = ${N(s.headF,0)}\\,\\text{m}`,
       d:'The height of a column of the liquid the pump could lift. Low-density methane needs about three times the head of LOX, which is why fuel pumps spin faster or use more stages.' },
     { id:'Po', sym:'\\mathcal{P}_o', name:'LOX pump power', res:`${fmt(s.powerO/1e3,0)} kW`,
-      f:'\\mathcal{P}_o = \\frac{\\dot m_o\\,(P_{dis,o}-p_{tank})}{\\rho_o\\,\\eta_p}', v:`\\mathcal{P}_o = \\frac{(${N(s.mdotO,3)})(${N(s.dPO,0)})}{(${N(p.rhoO,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_o = ${kW(s.powerO)}` },
+      f:'\\mathcal{P}_o = \\frac{\\dot m_o\\,(P_{dis,o}-p_{tank})}{\\rho_o\\,\\eta_p}', v:`\\mathcal{P}_o = \\frac{(${N(s.mdotO,3)})(${N(s.pDisO,0)} - ${N(p.pTank,0)})}{(${N(p.rhoO,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_o = ${kW(s.powerO)}` },
     { id:'Pf', sym:'\\mathcal{P}_f', name:'Fuel pump power', res:`${fmt(s.powerF/1e3,0)} kW`,
-      f:'\\mathcal{P}_f = \\frac{\\dot m_f\\,(P_{dis,f}-p_{tank})}{\\rho_f\\,\\eta_p}', v:`\\mathcal{P}_f = \\frac{(${N(s.mdotF,3)})(${N(s.dPF,0)})}{(${N(p.rhoF,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_f = ${kW(s.powerF)}` },
+      f:'\\mathcal{P}_f = \\frac{\\dot m_f\\,(P_{dis,f}-p_{tank})}{\\rho_f\\,\\eta_p}', v:`\\mathcal{P}_f = \\frac{(${N(s.mdotF,3)})(${N(s.pDisF,0)} - ${N(p.pTank,0)})}{(${N(p.rhoF,0)})(${N(p.etaPump,2)})}`, o:`\\mathcal{P}_f = ${kW(s.powerF)}` },
     { id:'Pt', sym:'\\mathcal{P}_{tot}', name:'Total pump power', res:`${fmt(s.powerTotal/1e3,0)} kW`, note:t.feasible ? 'supplied by the turbines' : 'more than the turbines can supply', warn:!t.feasible, main:true,
       f:'\\mathcal{P}_{tot} = \\mathcal{P}_o + \\mathcal{P}_f', v:`\\mathcal{P}_{tot} = ${N(s.powerO,0)} + ${N(s.powerF,0)}`, o:`\\mathcal{P}_{tot} = ${kW(s.powerTotal)}`,
       d:'The fuel pump needs almost as much power as the LOX pump while moving about a quarter of the mass, because methane is so much less dense.' },
@@ -332,13 +337,13 @@ function turboItems(p, r, s, t) {
   const pr = x => isFinite(x) ? fmt(x,3) : '—';
   const PR = (side, P, gas, g, cp, T, eta) => ({
     f:`\\pi_${side} = \\left(1 - \\frac{\\mathcal{P}_${side}}{\\dot m_{T${side}}\\,\\eta_t\\,c_{p,${side}}\\,T_{${side}pb}}\\right)^{-\\frac{\\gamma_${side}}{\\gamma_${side}-1}}`,
-    v:`\\pi_${side} = \\left(1 - \\frac{${N(P,0)}}{(${N(gas,3)})(${N(eta,2)})(${N(cp,0)})(${N(T,0)})}\\right)^{-${N(g/(g-1),3)}}`,
+    v:`\\pi_${side} = \\left(1 - \\frac{${N(P,0)}}{(${N(gas,3)})(${N(eta,2)})(${N(cp,0)})(${N(T,0)})}\\right)^{-\\frac{${N(g,2)}}{${N(g,2)}-1}}`,
   });
   const PRf = PR('f', s.powerF, t.gasF, p.gF, p.cpF, p.Tfpb, p.etaTurb), PRo = PR('o', s.powerO, t.gasO, p.gO, p.cpO, p.Topb, p.etaTurb);
   return [
     { id:'fo', sym:'\\dot m_{f,opb}', name:'Fuel to ox-rich PB', res:`${fmt(t.fOpb,3)} kg/s`,
       f:'\\begin{aligned} \\dot m_{f,fpb} + \\dot m_{f,opb} &= \\dot m_f \\\\ MR_{fpb}\\,\\dot m_{f,fpb} + MR_{opb}\\,\\dot m_{f,opb} &= \\dot m_o \\\\ \\Rightarrow\\ \\dot m_{f,opb} &= \\frac{\\dot m_o - MR_{fpb}\\,\\dot m_f}{MR_{opb} - MR_{fpb}} \\end{aligned}',
-      v:`\\dot m_{f,opb} = \\frac{${N(s.mdotO,3)} - (${N(p.MRfpb,2)})(${N(s.mdotF,3)})}{${N(p.MRopb,0)} - ${N(p.MRfpb,2)}} = \\frac{${N(s.mdotO - p.MRfpb*s.mdotF,3)}}{${N(p.MRopb - p.MRfpb,2)}}`,
+      v:[`\\dot m_{f,opb} &= \\frac{${N(s.mdotO,3)} - (${N(p.MRfpb,2)})(${N(s.mdotF,3)})}{${N(p.MRopb,0)} - ${N(p.MRfpb,2)}}`, `&= \\frac{${N(s.mdotO - p.MRfpb*s.mdotF,3)}}{${N(p.MRopb - p.MRfpb,2)}}`],
       o:`\\dot m_{f,opb} = ${N(t.fOpb,4)}\\,\\text{kg/s}`,
       d:'Two rules must hold at once: all the fuel is used (first line), and all the LOX is used, with each preburner taking LOX in proportion to its fuel at its own mixture ratio (second line). Substituting the first into the second and solving gives the small amount of fuel sent to the ox-rich preburner.' },
     { id:'ffpb', sym:'\\dot m_{f,fpb}', name:'Fuel to fuel-rich PB', res:`${fmt(t.fFpb,3)} kg/s`,
@@ -354,11 +359,11 @@ function turboItems(p, r, s, t) {
       o:`\\dot m_{o,opb} = ${N(t.oOpb,4)}\\,\\text{kg/s} \\qquad \\text{check: } \\dot m_o - \\dot m_{o,fpb} = ${N(s.mdotO,3)} - ${N(t.oFpb,3)} = ${N(s.mdotO - t.oFpb,3)}`,
       d:'Almost all of the LOX goes from the LOX pump to the ox-rich preburner. It is the ox-rich preburner\'s fuel times its mixture ratio, which equals the LOX pump flow minus the small amount sent to the fuel-rich preburner.' },
     { id:'gasF', sym:'\\dot m_{Tf}', name:'Fuel turbine gas flow', res:`${fmt(t.gasF,2)} kg/s`,
-      f:'\\dot m_{Tf} = \\dot m_{f,fpb} + \\dot m_{o,fpb} = \\dot m_{f,fpb}(1+MR_{fpb})', v:`\\dot m_{Tf} = ${N(t.fFpb,3)} \\times ${N(1+p.MRfpb,2)}`,
+      f:'\\dot m_{Tf} = \\dot m_{f,fpb} + \\dot m_{o,fpb} = \\dot m_{f,fpb}(1+MR_{fpb})', v:`\\dot m_{Tf} = ${N(t.fFpb,3)} + ${N(t.oFpb,3)} = ${N(t.fFpb,3)}(1+${N(p.MRfpb,2)})`,
       o:`\\dot m_{Tf} = ${N(t.gasF,3)}\\,\\text{kg/s}`,
       d:'Everything that burns in the fuel-rich preburner flows through the fuel turbine.' },
     { id:'gasO', sym:'\\dot m_{To}', name:'LOX turbine gas flow', res:`${fmt(t.gasO,2)} kg/s`,
-      f:'\\dot m_{To} = \\dot m_{f,opb} + \\dot m_{o,opb} = \\dot m_{f,opb}(1+MR_{opb})', v:`\\dot m_{To} = ${N(t.fOpb,4)} \\times ${N(1+p.MRopb,0)}`,
+      f:'\\dot m_{To} = \\dot m_{f,opb} + \\dot m_{o,opb} = \\dot m_{f,opb}(1+MR_{opb})', v:`\\dot m_{To} = ${N(t.fOpb,4)} + ${N(t.oOpb,3)} = ${N(t.fOpb,4)}(1+${N(p.MRopb,0)})`,
       o:`\\dot m_{To} = ${N(t.gasO,3)}\\,\\text{kg/s} \\qquad \\dot m_{Tf} + \\dot m_{To} = ${N(t.gasF+t.gasO,3)}\\,\\text{kg/s} = \\dot m`,
       d:'The two turbine flows add up to the full engine mass flow: that is what "full-flow" means. A huge gas flow means each turbine only needs a small pressure ratio.' },
     { id:'PRf', sym:'\\pi_f', name:'Fuel turbine pressure ratio', res:pr(t.PRf), ...PRf, o:`\\pi_f = ${isFinite(t.PRf) ? N(t.PRf,4) : '\\infty'}`,
@@ -368,12 +373,12 @@ function turboItems(p, r, s, t) {
     { id:'Ppb', sym:'P_{pb}', name:'Preburner pressure (F / O)', main:true,
       res:t.feasible ? `${fmt(t.Pfpb/1e6,1)} / ${fmt(t.Popb/1e6,1)} MPa` : 'no solution',
       note:t.feasible ? `converged in ${t.iterations} iterations` : t.reason, warn:!t.feasible,
-      f:'P_{pb} = \\pi \\cdot P_c\\,(1+\\Delta P_{inj})', v:`P_{fpb} = ${pr(t.PRf)} \\times ${N(t.pOut,0)} \\quad P_{opb} = ${pr(t.PRo)} \\times ${N(t.pOut,0)}`,
+      f:'P_{pb} = \\pi \\cdot P_c\\,(1+\\Delta P_{inj})', v:`P_{fpb} = ${pr(t.PRf)} \\cdot ${N(p.Pc,0)}(1+${N(p.injDrop,2)}) \\quad P_{opb} = ${pr(t.PRo)} \\cdot ${N(p.Pc,0)}(1+${N(p.injDrop,2)})`,
       o:t.feasible ? `P_{fpb} = ${MPa(t.Pfpb)} \\quad P_{opb} = ${MPa(t.Popb)}` : '\\text{no power balance}',
       d:'Turbine exhaust feeds the main injector, so it leaves at P_c plus the injector drop. Raising the pressure ratio raises preburner pressure, which raises pump discharge and pump power, which needs a higher pressure ratio: the loop is solved by iteration. At high chamber pressure it has no solution.' },
     { id:'Tex', sym:'T_{exit}', name:'Turbine exit temp (F / O)', res:t.feasible ? `${fmt(t.TexitF,0)} / ${fmt(t.TexitO,0)} K` : '—',
       f:'T_{exit} = T_{pb}\\left[1 - \\eta_t\\left(1 - \\pi^{-\\frac{\\gamma-1}{\\gamma}}\\right)\\right]',
-      v:`T_{exit,f} = ${N(p.Tfpb,0)}\\left[1 - ${N(p.etaTurb,2)}\\left(1 - ${pr(t.PRf)}^{-${N((p.gF-1)/p.gF,4)}}\\right)\\right]`,
+      v:`T_{exit,f} = ${N(p.Tfpb,0)}\\left[1 - ${N(p.etaTurb,2)}\\left(1 - ${pr(t.PRf)}^{-\\frac{${N(p.gF,2)}-1}{${N(p.gF,2)}}}\\right)\\right] \\quad T_{exit,o} = ${N(p.Topb,0)}\\left[1 - ${N(p.etaTurb,2)}\\left(1 - ${pr(t.PRo)}^{-\\frac{${N(p.gO,2)}-1}{${N(p.gO,2)}}}\\right)\\right]`,
       o:t.feasible ? `T_{exit,f} = ${N(t.TexitF,1)}\\,\\text{K} \\quad T_{exit,o} = ${N(t.TexitO,1)}\\,\\text{K}` : '\\text{—}',
       d:'Gas temperature entering the main injector after doing work in the turbine.' },
   ];
