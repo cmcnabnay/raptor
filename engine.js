@@ -63,14 +63,15 @@
   }
 
   // Stage 2: propellant supply. Splits the nozzle's mass flow by mixture ratio (O/F by mass)
-  // and sizes each pump. Discharge must clear Pc plus the injector drop; fuel also passes
-  // through the regen cooling jacket first. Preburner pressure is added in stage 3.
-  function computeSupply(p, noz) {
+  // and sizes each pump. By default discharge only clears Pc plus the injector drop (fuel also
+  // passes through the regen cooling jacket first). Stage 3 passes pDis = { O, F } instead,
+  // so the pumps clear the preburners.
+  function computeSupply(p, noz, pDis) {
     const { MR, rhoO, rhoF, pTank, etaPump, injDrop, coolDrop, Pc } = p;
     const mdotO = noz.mdot * MR / (1 + MR);
     const mdotF = noz.mdot / (1 + MR);
-    const pDisO = Pc * (1 + injDrop);
-    const pDisF = Pc * (1 + injDrop + coolDrop);
+    const pDisO = pDis ? pDis.O : Pc * (1 + injDrop);
+    const pDisF = pDis ? pDis.F : Pc * (1 + injDrop + coolDrop);
     const dPO = pDisO - pTank, dPF = pDisF - pTank;
     const powerO = mdotO * dPO / (rhoO * etaPump);
     const powerF = mdotF * dPF / (rhoF * etaPump);
@@ -82,12 +83,68 @@
     };
   }
 
+  // Stage 3: full-flow staged combustion. Every kg of propellant passes through a preburner and
+  // a turbine before reaching the main injector. The fuel-rich side drives the fuel pump and
+  // the ox-rich side drives the LOX pump. Preburner temperatures are inputs (no combustion
+  // chemistry yet). Turbine power must equal pump power, but pump power depends on preburner
+  // pressure, which depends on the turbine pressure ratio, so iterate to a fixed point.
+  function computeTurbomachinery(p, noz) {
+    const { MRfpb, MRopb, Tfpb, Topb, cpF, cpO, gF, gO, etaTurb, pbDrop, Pc, injDrop, coolDrop } = p;
+    const base = computeSupply(p, noz);
+    const { mdotO, mdotF } = base;
+
+    // Split each propellant between the preburners so both hold their mixture ratios:
+    // fFpb + fOpb = mdotF and MRfpb*fFpb + MRopb*fOpb = mdotO
+    const fOpb = (mdotO - MRfpb * mdotF) / (MRopb - MRfpb);
+    const fFpb = mdotF - fOpb;
+    const oFpb = MRfpb * fFpb, oOpb = MRopb * fOpb;
+    const gasF = fFpb + oFpb, gasO = fOpb + oOpb;
+
+    const pOut = Pc * (1 + injDrop); // turbine exhaust must clear the main injector
+    const maxF = gasF * etaTurb * cpF * Tfpb; // turbine power at infinite pressure ratio
+    const maxO = gasO * etaTurb * cpO * Topb;
+    // Pressure ratio at which the turbine makes exactly `power`
+    const ratio = (power, max, g) => power >= max ? Infinity : Math.pow(1 - power / max, -g / (g - 1));
+
+    let reason = null;
+    if (!(MRfpb < p.MR && p.MR < MRopb)) reason = 'Engine mixture ratio must lie between the two preburner ratios';
+
+    let s = base, PRf = 1, PRo = 1, iterations = 0;
+    if (!reason) {
+      for (; iterations < 200; iterations++) {
+        PRf = ratio(s.powerF, maxF, gF);
+        PRo = ratio(s.powerO, maxO, gO);
+        if (!isFinite(PRf) || !isFinite(PRo)) { reason = 'Turbines cannot make enough power for the pumps'; break; }
+        const pPB = Math.max(PRf, PRo) * pOut * (1 + pbDrop); // pumps feed both preburners
+        const next = computeSupply(p, noz, { O: pPB, F: pPB + Pc * coolDrop });
+        const done = Math.abs(next.powerTotal - s.powerTotal) <= 1e-10 * next.powerTotal;
+        s = next;
+        if (done) break;
+      }
+      if (!reason && iterations === 200) reason = 'Power balance did not converge (near the turbine power limit)';
+      if (!reason) {
+        PRf = ratio(s.powerF, maxF, gF);
+        PRo = ratio(s.powerO, maxO, gO);
+        if (!isFinite(PRf) || !isFinite(PRo)) reason = 'Turbines cannot make enough power for the pumps';
+      }
+    }
+
+    // Isentropic turbine expansion with efficiency etaTurb
+    const Tout = (T, PR, g) => T * (1 - etaTurb * (1 - Math.pow(PR, -(g - 1) / g)));
+    return {
+      supply: reason ? base : s, fFpb, oFpb, fOpb, oOpb, gasF, gasO, pOut, maxF, maxO,
+      PRf, PRo, Pfpb: PRf * pOut, Popb: PRo * pOut,
+      TexitF: Tout(Tfpb, PRf, gF), TexitO: Tout(Topb, PRo, gO),
+      feasible: !reason, reason, iterations,
+    };
+  }
+
   // Approximate standard-atmosphere pressure (Pa) at altitude h (m).
   function ambientPressure(h) {
     if (h <= 11000) return 101325 * Math.pow(1 - 2.25577e-5 * h, 5.25588);
     return 22632 * Math.exp(-(h - 11000) / 6340); // roughly isothermal above the tropopause
   }
 
-  const api = { G0, areaRatio, solveExitMach, computeNozzle, computeSupply, ambientPressure };
+  const api = { G0, areaRatio, solveExitMach, computeNozzle, computeSupply, computeTurbomachinery, ambientPressure };
   if (typeof module !== 'undefined') module.exports = api; else root.RaptorEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
